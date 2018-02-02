@@ -1,0 +1,481 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
+  <head>
+    <meta charset="utf-8" />
+
+    <title>Class Data Sharing - Sharing Economy in the HotSpot VM</title>
+
+    <meta name="description" content="Class Data Sharing in the HotSpot VM" />
+    <meta name="author" content="Volker H. Simonis" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui" />
+
+    <link rel="stylesheet" href="reveal.js/css/reveal.css" />
+    <link rel="stylesheet" href="reveal.js/css/theme/joker2017.css" id="theme" />
+    <!-- Code syntax highlighting -->
+    <link rel="stylesheet" href="reveal.js/lib/css/monokai_sublime.css" />
+    <!-- Local overrides -->
+    <link rel="stylesheet" href="css/local.css" />
+
+    <style type="text/css">
+    </style>
+
+    <!-- Printing and PDF exports -->
+    <script>
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = window.location.search.match( /print-pdf/gi ) ? 'reveal.js/css/print/pdf.css' : 'reveal.js/css/print/paper.css';
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+
+    <!--[if lt IE 9]>
+    <script src="reveal.js/lib/js/html5shiv.js"></script>
+    <![endif]-->
+
+    <!--
+      Issue #1105: Keyboard shortcut to skip forward/back over fragments #1173
+      https://github.com/hakimel/reveal.js/pull/1173
+    -->
+  </head>
+
+<!--
+;; indent block of text
+;; C-u <number> C-x <TAB>
+
+
+
+;; select this code and do 'M-x eval-region'
+(defun make-fragment (p1 p2)
+  "Wraps the selection into 'fragment' <span>s and quotes '&', '<' and '>'."
+  (interactive "r")
+  (setq inputStr (buffer-substring-no-properties p1 p2))
+  (setq inputStr (replace-regexp-in-string "&" "&amp;" inputStr))
+  (setq inputStr (replace-regexp-in-string "<" "&lt;" inputStr))
+  (setq inputStr (replace-regexp-in-string ">" "&gt;" inputStr))
+  (setq resultStr (concat "<span class=\"fragment\">" (concat inputStr "</span>")))
+  (delete-region p1 p2)
+  (insert resultStr)
+)
+(defun make-fragment-simple (p1 p2)
+  "Wraps the selection into 'fragment' <span>s without any quoting."
+  (interactive "r")
+  (setq inputStr (buffer-substring-no-properties p1 p2))
+  (setq resultStr (concat "<span class=\"fragment\">" (concat inputStr "</span>")))
+  (delete-region p1 p2)
+  (insert resultStr)
+)
+(defun quote-fragment (p1 p2)
+  "Quotes '&', '<' and '>'."
+  (interactive "r")
+  (setq inputStr (buffer-substring-no-properties p1 p2))
+  (setq inputStr (replace-regexp-in-string "&" "&amp;" inputStr))
+  (setq inputStr (replace-regexp-in-string "<" "&lt;" inputStr))
+  (setq inputStr (replace-regexp-in-string ">" "&gt;" inputStr))
+  (delete-region p1 p2)
+  (insert inputStr)
+)
+
+(global-set-key (kbd "C-f") 'make-fragment)
+(global-set-key (kbd "C-S-f") 'make-fragment-simple)
+(global-set-key (kbd "C-S-q") 'quote-fragment)
+;; revert key-binding
+;; (global-set-key (kbd "C-f") 'forward-char)
+;;
+;; use 'C-h k <keystroke>' to find out what <keystroke> ia currently bound to
+
+;; (vhs) The following is required to make 'C-c C-t' insert <code> tags without
+;; newlines. 'sgml-tag-alist' is the "file-local" version of 'html-tag-alist'
+(add-to-list 'html-tag-alist '("code"))
+(add-to-list 'sgml-tag-alist '("code"))
+
+-->
+
+  <body>
+
+    <div class="reveal">
+
+      <!-- Any section element inside of this container is displayed as a slide -->
+      <div class="slides">
+
+        <section>
+          <h1>Class Data Sharing</h1>
+          <h3>Sharing Economy in the HotSpot VM</h3>
+          <p>
+            <small>Volker Simonis, SAP / <a href="mailto:volker.simonis@gmail.com">volker.simonis@gmail.com</a></small>
+          </p>
+        </section>
+
+        <section>
+          <h2>Class Data Sharing</h2>
+
+          <ul>
+            <li>Cache preprocessed class metadata on disc</li>
+            <li>Improve startup performance</li>
+            <li>Reduce memory footprint</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Short History of CDS in the HotSpot VM</h2>
+
+          <ul>
+            <li>Introduced 2004 with <a href="https://docs.oracle.com/javase/1.5.0/docs/guide/vm/class-data-sharing.html">JDK 1.5</a>
+              <ul>
+                <li>Only for Client VM, only Serial GC</li>
+                <li>Only system classes</li>
+              </ul>
+            </li>
+            <li>Part of the initial OpenJDK 6/7 contribution</li>
+            <li>Since OpenJDK 9 / <a href="https://docs.oracle.com/javase/9/vm/class-data-sharing.htm#JSJVM-GUID-0260F857-A70E-4399-A1DF-A5766BE33285">JDK 9</a>:
+              <ul>
+                <li>Support for Server VM</li>
+                <li>Support for G1, Serial, Parallel and ParallelOld GCs</li>
+                <li>Support for shared strings (only with G1, non-Windows)</li>
+                <li>Support for application classes
+                  (<a href="https://docs.oracle.com/javase/9/tools/java.htm#JSWOR-GUID-31503FCE-93D0-4175-9B4F-F6A738B2F4C4">commercial Oracle JDK feature</a>)</li>
+              </ul>
+            </li>
+            <li>Coming with OpenJDK 10:
+              <ul>
+                <li><a href="http://openjdk.java.net/jeps/31">JEP 310: Application Class-Data Sharing</a></li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+
+        <section class="demo">
+
+          <section>
+
+            <h2>Class representation in the HotSpot VM</h2>
+
+          </section>
+
+
+          <section>
+            <div width="100%" style="position: relative; margin: 0 0 0 0px;">
+              <div class="" style="position: static;">
+                <object data="images/CodeCacheMetaspaceHeap_1.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="1" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_2.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="2" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_3.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="3" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_4.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="4" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_5.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="5" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_6.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="6" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_7.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="7" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_8.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="8" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_9.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+              <div class="fragment" data-fragment-index="9" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_10.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+<!--
+              <div class="fragment" data-fragment-index="10" style="position: absolute; left: 0; top: 0; width: 100%">
+                <object data="images/CodeCacheMetaspaceHeap_11.svg" type="image/svg+xml"
+                        style="width: 100%;">&nbsp;</object>
+              </div>
+-->
+            </div>
+          </section>
+
+        </section>
+
+        <section class="demo">
+
+          <section class="demo">
+
+            <h2>CDS Basics - Create the Archive</h2>
+
+          </section>
+
+          <section class="demo">
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%">
+$ java -Xshare:dump<span class="fragment" data-fragment-index="0">
+<span class="fragment highlight-current-border" data-fragment-index="1">Allocated shared space: 3221225472 bytes at 0x0000000800000000</span>
+<span class="fragment highlight-current-border" data-fragment-index="2">Loading classes to share ...</span> <span class="fragment" data-fragment-index="2">// from JAVA_HOME/lib/classlist</span>
+<span class="fragment highlight-current-border" data-fragment-index="3">Rewriting and linking classes ...</span> <span class="fragment" data-fragment-index="3"> // Verification, ...</span>
+Number of classes 1240
+Updating ConstMethods ... done.
+Removing unshareable information ... done.
+<span class="fragment highlight-current-border" data-fragment-index="4">Relocating embedded pointers ...</span>
+Relocating external roots ...
+Verifying external roots ...
+Dumping symbol table ...
+Dumping String objects to closed archive heap region ...
+<span class="fragment highlight-current-border" data-fragment-index="5">Removing java_mirror ... done.</span> <span class="fragment" data-fragment-index="5"> // java.lang.Class&lt;?&gt;</span>
+mc  space:     21832 [  0,1% ] ... at 0x0000000800000000
+<span class="fragment highlight-current-border" data-fragment-index="6">rw  space:   4093816 [ 22,2% ] ... at 0x0000000800006000</span>
+<span class="fragment highlight-current-border" data-fragment-index="7">ro  space:   7313320 [ 39,7% ] ... at 0x00000008003ee000</span>
+md  space:      6352 [  0,0% ] ... at 0x0000000800ae8000
+od  space:   6462536 [ 35,1% ] ... at 0x0000000800aea000
+<span class="fragment highlight-current-border border-no-bottom" data-fragment-index="8">st0 space:    458752 [  2,5% ] ... at 0x00000000fff00000</span>
+<span class="fragment highlight-current-border border-no-top" data-fragment-index="8">oa0 space:     65536 [  0,4% ] ... at 0x00000000ffe00000</span>
+total    :  18422144 [100.0% ] <span class="fragment" data-fragment-index="9"> // JAVA_HOME/lib/server/classes.jsa</span></span>
+              </code>
+            </pre>
+
+          </section>
+
+
+        </section>
+
+<!--
+
+ConstantPool::archive_resolved_references(Thread *) : void - /jdk-hs/share/oops/constantPool.cpp
+  MetaspaceShared::archive_resolved_constants(Thread *) : void - /jdk-hs/share/memory/metaspaceShared.cpp
+    MetaspaceShared::dump_open_archive_heap_objects(GrowableArray<MemRegion> *) : void - /jdk-hs/share/memory/metaspaceShared.cpp
+      VM_PopulateDumpSharedSpace::dump_java_heap_objects() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+        VM_PopulateDumpSharedSpace::doit() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+
+
+G1CollectedHeap::alloc_archive_regions(MemRegion *, size_t, bool) : bool - /jdk-hs/share/gc/g1/g1CollectedHeap.cpp
+  FileMapInfo::map_heap_data(MemRegion * *, int, int, int *, bool) : bool - /jdk-hs/share/memory/filemap.cpp
+    FileMapInfo::map_heap_regions() : void - /jdk-hs/share/memory/filemap.cpp (2 matches)
+      MetaspaceShared::initialize_runtime_shared_and_meta_spaces() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+        Metaspace::global_initialize() : void - /jdk-hs/share/memory/metaspace.cpp
+          universe_init() : jint - /jdk-hs/share/memory/universe.cpp
+
+
+$ ls -la /share/output-jdk-hs-dbg/images/jdk/lib/server/classes.jsa
+ 1 simonis simonis 18436096 Feb  2 11:28 /share/output-jdk-hs-dbg/images/jdk/lib/server/classes.jsa
+
+arguments.cpp
+=============
+#if COMPILER2_OR_JVMCI
+  // Shared spaces work fine with other GCs but causes bytecode rewriting
+  // to be disabled, which hurts interpreter performance and decreases
+  // server performance.  When -server is specified, keep the default off
+  // unless it is asked for.  Future work: either add bytecode rewriting
+  // at link time, or rewrite bytecodes in non-shared methods.
+  if (is_server_compilation_mode_vm() && !DumpSharedSpaces && !RequireSharedSpaces &&
+      (FLAG_IS_DEFAULT(UseSharedSpaces) || !UseSharedSpaces)) {
+    no_shared_spaces("COMPILER2 default: -Xshare:auto | off, have to manually setup to on.");
+  }
+#endif
+
+// Null out class_loader_data because we don't share that yet.
+set_class_loader_data(NULL);
+Klass::remove_unshareable_info() : void - /jdk-hs/share/oops/klass.cpp
+  InstanceKlass::remove_unshareable_info() : void - /jdk-hs/share/oops/instanceKlass.cpp (2 matches)
+    InstanceKlass::remove_unshareable_info() : void - /jdk-hs/share/oops/instanceKlass.cpp
+    remove_unshareable_in_classes() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+      VM_PopulateDumpSharedSpace::doit() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+
+Creating and using archive ONLY with same configuration (i.e. CompressedOops mode)
+
+-XX:SharedBaseAddress=0x900000000
+
+rewrite_nofast_bytecode(Method *) : void - /jdk-hs/share/memory/metaspaceShared.cpp
+  rewrite_nofast_bytecodes_and_calculate_fingerprints() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+    VM_PopulateDumpSharedSpace::doit() : void - /jdk-hs/share/memory/metaspaceShared.cpp
+      VM_Operation::evaluate() : void - /jdk-hs/share/runtime/vm_operations.cpp
+
+#0  ClassListParser::load_current_class (this=0x7ffff7fd7960, __the_thread__=0x7ffff001a6f0) at /share/OpenJDK/jdk-hs/src/hotspot/share/classfile/classListParser.cpp:323
+#1  0x00007ffff5a89f98 in ClassLoaderExt::load_one_class (parser=0x7ffff7fd7960, __the_thread__=0x7ffff001a6f0) at /share/OpenJDK/jdk-hs/src/hotspot/share/classfile/classLoaderExt.cpp:350
+#2  0x00007ffff624699a in MetaspaceShared::preload_classes (class_list_path=0x7ffff000fa70 "TwoLoaders_a.cls", __the_thread__=0x7ffff001a6f0) at /share/OpenJDK/jdk-hs/src/hotspot/share/memory/metaspaceShared.cpp:1615
+#3  0x00007ffff62467a6 in MetaspaceShared::preload_and_dump (__the_thread__=0x7ffff001a6f0) at /share/OpenJDK/jdk-hs/src/hotspot/share/memory/metaspaceShared.cpp:1584
+#4  0x00007ffff651e8a4 in Threads::create_vm (args=0x7ffff7fd9e20, canTryAgain=0x7ffff7fd9d0b) at /share/OpenJDK/jdk-hs/src/hotspot/share/runtime/thread.cpp:3990
+#5  0x00007ffff5f3283c in JNI_CreateJavaVM_inner (vm=0x7ffff7fd9e88, penv=0x7ffff7fd9e90, args=0x7ffff7fd9e20) at /share/OpenJDK/jdk-hs/src/hotspot/share/prims/jni.cpp:3908
+#6  0x00007ffff5f32bdd in JNI_CreateJavaVM (vm=0x7ffff7fd9e88, penv=0x7ffff7fd9e90, args=0x7ffff7fd9e20) at /share/OpenJDK/jdk-hs/src/hotspot/share/prims/jni.cpp:4003
+#7  0x00007ffff7bcd39a in InitializeJVM (pvm=0x7ffff7fd9e88, penv=0x7ffff7fd9e90, ifn=0x7ffff7fd9ee0) at /share/OpenJDK/jdk-hs/src/java.base/share/native/libjli/java.c:1478
+#8  0x00007ffff7bca0e2 in JavaMain (_args=0x7fffffffa9f0) at /share/OpenJDK/jdk-hs/src/java.base/share/native/libjli/java.c:411
+#9  0x00007ffff71ca184 in start_thread () from /lib/x86_64-linux-gnu/libpthread.so.0
+#10 0x00007ffff78faffd in clone () from /lib/x86_64-linux-gnu/libc.so.6
+
+For all entries without 'source:' tag call "java_system_loader().loadClass()"
+
+For all other entries (with 'source:' tag) call ClassListParser::load_class_from_source(Symbol* class_name, TRAPS)
+
+Use the following command to dump a shared archive:
+
+/share/output-jdk-hs-dbg/images/jdk/bin/java -XX:+UnlockDiagnosticVMOptions -XX:SharedArchiveFile=/tmp/TwoLoaders_a.jsa -XX:+PrintSharedArchiveAndExit -XX:+PrintSharedDictionary -cp simonis.jar io.simonis.TwoLoaders
+
+java_lang_Class::set_klass(oop, Klass *) : void - /jdk-hs/share/classfile/javaClasses.cpp
+  InstanceKlass::deallocate_contents(ClassLoaderData *) : void - /jdk-hs/share/oops/instanceKlass.cpp
+  java_lang_Class::create_mirror(Klass *, Handle, Handle, Handle, Thread *) : void - /jdk-hs/share/classfile/javaClasses.cpp (2 matches)
+    ArrayKlass::complete_create_array_klass(ArrayKlass *, Klass *, ModuleEntry *, Thread *) : void - /jdk-hs/share/oops/arrayKlass.cpp
+    ClassFileParser::fill_instance_klass(InstanceKlass *, bool, Thread *) : void - /jdk-hs/share/classfile/classFileParser.cpp
+      ClassFileParser::create_instance_klass(bool, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/classFileParser.cpp
+        KlassFactory::check_shared_class_file_load_hook(InstanceKlass *, Symbol *, Handle, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/klassFactory.cpp
+          SystemDictionary::load_shared_class(InstanceKlass *, Handle, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+        KlassFactory::create_from_stream(ClassFileStream *, Symbol *, ClassLoaderData *, Handle, const InstanceKlass *, GrowableArray<Handle> *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/klassFactory.cpp (2 matches)
+          ClassLoader::load_class(Symbol *, bool, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/classLoader.cpp
+          ClassLoaderExt::load_class(Symbol *, const char *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/classLoaderExt.cpp
+          SystemDictionary::parse_stream(Symbol *, Handle, Handle, ClassFileStream *, const InstanceKlass *, GrowableArray<Handle> *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+          SystemDictionary::resolve_from_stream(Symbol *, Handle, Handle, ClassFileStream *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+    java_lang_Class::fixup_mirror(Klass *, Thread *) : void - /jdk-hs/share/classfile/javaClasses.cpp
+    Klass::restore_unshareable_info(ClassLoaderData *, Handle, Thread *) : void - /jdk-hs/share/oops/klass.cpp
+      ArrayKlass::restore_unshareable_info(ClassLoaderData *, Handle, Thread *) : void - /jdk-hs/share/oops/arrayKlass.cpp
+      initialize_basic_type_klass(Klass *, Thread *) : void - /jdk-hs/share/memory/universe.cpp
+      InstanceKlass::restore_unshareable_info(ClassLoaderData *, Handle, Thread *) : void - /jdk-hs/share/oops/instanceKlass.cpp (2 matches)
+        initialize_basic_type_klass(Klass *, Thread *) : void - /jdk-hs/share/memory/universe.cpp
+        InstanceKlass::restore_unshareable_info(ClassLoaderData *, Handle, Thread *) : void - /jdk-hs/share/oops/instanceKlass.cpp
+        SystemDictionary::load_shared_class(InstanceKlass *, Handle, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+          SystemDictionary::load_shared_class(Symbol *, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+          SystemDictionaryShared::acquire_class_for_current_thread(InstanceKlass *, Handle, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+          SystemDictionaryShared::load_shared_class_for_builtin_loader(Symbol *, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+            SystemDictionaryShared::find_or_load_shared_class(Symbol *, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+
+
+// There can be only 1 class with this name for unregistered loaders.
+SharedDictionary::get_entry_for_unregistered_loader(const Symbol *, int, int) : SharedDictionaryEntry * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+  SharedDictionary::class_exists_for_unregistered_loader(const Symbol *) : bool - /jdk-hs/share/classfile/systemDictionaryShared.hpp
+    SystemDictionaryShared::lookup_from_stream(const Symbol *, Handle, Handle, const ClassFileStream *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+  SharedDictionary::find_class_for_unregistered_loader(const Symbol *, int, int) : Klass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+    SystemDictionaryShared::lookup_from_stream(const Symbol *, Handle, Handle, const ClassFileStream *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+      SystemDictionary::resolve_from_stream(Symbol *, Handle, Handle, ClassFileStream *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+        jni_DefineClass(JNIEnv *, const char *, jobject, const jbyte *, jsize) : jclass - /jdk-hs/share/prims/jni.cpp
+          {init jni_NativeInterface}() : JNINativeInterface_ - /jdk-hs/share/prims/jni.cpp
+        jvm_define_class_common(JNIEnv *, const char *, jobject, const jbyte *, jsize, jobject, const char *, Thread *) : jclass - /jdk-hs/share/prims/jvm.cpp
+          JVM_DefineClass(JNIEnv *, const char *, jobject, const jbyte *, jsize, jobject) : jclass - /jdk-hs/share/prims/jvm.cpp
+            Unsafe_DefineClass_impl(JNIEnv *, jstring, jbyteArray, int, int, jobject, jobject) : jclass - /jdk-hs/share/prims/unsafe.cpp
+              Unsafe_DefineClass0(JNIEnv *, jobject, jstring, jbyteArray, int, int, jobject, jobject) : jclass - /jdk-hs/share/prims/unsafe.cpp
+                {init jdk_internal_misc_Unsafe_methods}() : JNINativeMethod [71] - /jdk-hs/share/prims/unsafe.cpp
+          JVM_DefineClassWithSource(JNIEnv *, const char *, jobject, const jbyte *, jsize, jobject, const char *) : jclass - /jdk-hs/share/prims/jvm.cpp
+
+
+Dictionary::add_entry(int, DictionaryEntry *) : void - /jdk-hs/share/classfile/dictionary.hpp
+  CombineDictionariesClosure::do_cld(ClassLoaderData *) : void - /jdk-hs/share/classfile/systemDictionary.cpp
+  Dictionary::add_klass(unsigned int, Symbol *, InstanceKlass *) : void - /jdk-hs/share/classfile/dictionary.cpp
+    SystemDictionary::update_dictionary(unsigned int, int, unsigned int, InstanceKlass *, Handle, Thread *) : void - /jdk-hs/share/classfile/systemDictionary.cpp
+  SharedDictionary::add_non_builtin_klass(const Symbol *, ClassLoaderData *, InstanceKlass *) : bool - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+    SystemDictionaryShared::add_non_builtin_klass(Symbol *, ClassLoaderData *, InstanceKlass *, Thread *) : bool - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+      // if (!SystemDictionaryShared::add_non_builtin_klass(class_name, ClassLoaderData::the_null_class_loader_data(),...)
+      // This adds the loaded class to the boot_loader_dictionary with a class loader set to the null (boot) class loader (altough the class was loaded by a custom class loader!!!)
+      ClassListParser::load_class_from_source(Symbol *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/classListParser.cpp
+        ClassListParser::load_current_class(Thread *) : Klass * - /jdk-hs/share/classfile/classListParser.cpp
+          ClassLoaderExt::load_one_class(ClassListParser *, Thread *) : Klass * - /jdk-hs/share/classfile/classLoaderExt.cpp
+            MetaspaceShared::preload_classes(const char *, Thread *) : int - /jdk-hs/share/memory/metaspaceShared.cpp
+              MetaspaceShared::preload_and_dump(Thread *) : void - /jdk-hs/share/memory/metaspaceShared.cpp (2 matches)
+
+
+At runtime:
+
+SystemDictionaryShared::acquire_class_for_current_thread(InstanceKlass *, Handle, Handle, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+    if (ik->class_loader_data() != NULL) {
+      //    ik is already loaded (by this loader or by a different loader)
+      // or ik is being loaded by a different thread (by this loader or by a different loader)
+      return NULL;
+    }
+SharedDictionary::find_class_for_unregistered_loader(const Symbol *, int, int) : Klass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+  SystemDictionaryShared::lookup_from_stream(const Symbol *, Handle, Handle, const ClassFileStream *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionaryShared.cpp
+    SystemDictionary::resolve_from_stream(Symbol *, Handle, Handle, ClassFileStream *, Thread *) : InstanceKlass * - /jdk-hs/share/classfile/systemDictionary.cpp
+      jni_DefineClass(JNIEnv *, const char *, jobject, const jbyte *, jsize) : jclass - /jdk-hs/share/prims/jni.cpp
+      jvm_define_class_common(JNIEnv *, const char *, jobject, const jbyte *, jsize, jobject, const char *, Thread *) : jclass - /jdk-hs/share/prims/jvm.cpp
+        JVM_DefineClass(JNIEnv *, const char *, jobject, const jbyte *, jsize, jobject) : jclass - /jdk-hs/share/prims/jvm.cpp
+        JVM_DefineClassWithSource(JNIEnv *, const char *, jobject, const jbyte *, jsize, jobject, const char *) : jclass - /jdk-hs/share/prims/jvm.cpp
+
+
+TODO:
+
+InstanceKlass* ClassListParser::load_class_from_source(Symbol* class_name, TRAPS) {
+
+We shoould probably check for other 'prohibited packages' as well (and before we load the klass!):
+
+  InstanceKlass* k = ClassLoaderExt::load_class(class_name, _source, THREAD);
+
+  if (strncmp(_class_name, "java/", 5) == 0) {
+    log_info(cds)("Prohibited package for non-bootstrap classes: %s.class from %s",
+          _class_name, _source);
+    return NULL;
+  }
+
+-->
+
+      </div>
+    </div>
+
+    <script src="reveal.js/lib/js/head.min.js"></script>
+    <script src="reveal.js/js/reveal.js"></script>
+
+    <script>
+
+      // Full list of configuration options available at:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        width: 1024,
+        height: 768,
+        //width: 1280,
+        //height: 720,
+        //width: 1366,
+        //height: 768,
+        //width: 1920,
+        //height: 1080,
+        //margin: 0.1, // Old setting which was used in the reveal.js version used for the JET2015 presentation
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        slideNumber: true,
+
+        transition: 'none', // none/fade/slide/convex/concave/zoom
+
+        // Optional reveal.js plugins
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'reveal.js/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, condition: function() { return !!document.querySelector( 'pre code' ); }, callback: function() {
+
+hljs.registerLanguage('terminal', function(hljs) {
+  return {
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      {
+        className: 'title',
+        lexemes: /[$()>_a-zA-Z0-9]+/,
+        keywords: "$ (gdb) hsdb>",
+        begin: /^\$ |\(gdb\)|hsdb> /,
+        end: /[^\\]\n/,
+	contains: [
+          hljs.COMMENT('//', '$', { endsParent: true })
+	]
+      }
+    ]
+  }
+});
+
+hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true }
+        ]
+      });
+
+      //Reveal.configure({ slideNumber: true });
+    </script>
+
+  </body>
+</html>
