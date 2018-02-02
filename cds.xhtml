@@ -255,9 +255,76 @@ total    :  18422144 [100.0% ] <span class="fragment" data-fragment-index="9"> /
 
           </section>
 
-
         </section>
 
+        <section class="demo">
+
+          <section class="demo">
+
+            <h2>CDS Basics - Using the Archive</h2>
+
+            <pre class="big noshadow" style="height:100%; margin: 0; display: block" data-trim="true">
+              <code class="java" data-trim="true" data-noescape="true" style="height:100%">
+package io.simonis;
+
+public class HelloCDS {
+  public static void main(String[] args) throws IOException {
+    System.out.println("Hello CDS");
+    System.in.read();
+  }
+}
+              </code>
+            </pre>
+          </section>
+
+          <section class="demo">
+
+            <h2>CDS Basics - Using the Archive</h2>
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ java <span class="fragment highlight-current-border">-Xshare:on</span> io.simonis.HelloCDS
+<span class="fragment">HelloCDS
+$ </span><span class="fragment">java -Xshare:on <span class="fragment highlight-current-border">-Xlog:class+load</span> io.simonis.HelloCDS
+</span><span class="fragment">[class,load] java.lang.Object <span class="fragment highlight-current-border">source: shared objects file</span>
+...</span>
+<span class="fragment">[class,load] j.i.l.URLClassPath$FileLoader <span class="fragment highlight-current-border">source: jrt:/java.base</span>
+...</span>
+<span class="fragment">[class,load] io.simonis.HelloCDS2 source: <span class="fragment highlight-current-border">file:/examples/bin/</span>
+HelloCDS</span>
+              </code>
+            </pre>
+          </section>
+
+          <section class="demo">
+
+            <h2>CDS Basics - Using the Archive</h2>
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ java -Xshare:on io.simonis.HelloCDS &amp;
+HelloCDS
+$ pmap -X `pgrep -f HelloCDS`
+5707:  /jdk/bin/java -Xshare:auto io.simonis.HelloCDS
+       Address Perm    Size   Rss   Pss Mapping
+      00400000 r-xp       8     8     8 /jdk/bin/java
+      00601000 r--p       4     4     4 /jdk/bin/java
+      00602000 rw-p       4     4     4 /jdk/bin/java
+      009b8000 rw-p     132    28    28 [heap]
+      83200000 rw-p  129024  2048  2048
+      8b000000 ---p 1914880     0     0
+      ffe00000 rw-p      64    64    64 /jdk/lib/server/classes.jsa
+      fff00000 rw-p     448   448   448 /jdk/lib/server/classes.jsa
+     800000000 rwxp      24    24    24 /jdk/lib/server/classes.jsa
+     800006000 rw-p    4000  3168  3168 /jdk/lib/server/classes.jsa
+     8003ee000 r--p    7144  5160  5160 /jdk/lib/server/classes.jsa
+     800ae8000 rw-p       8     8     8 /jdk/lib/server/classes.jsa
+     800aea000 r--p    6312     0     0 /jdk/lib/server/classes.jsa
+              </code>
+            </pre>
+          </section>
+
+        </section>
 
         <section>
 
