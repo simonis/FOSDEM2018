@@ -87,7 +87,7 @@
 ;; revert key-binding
 ;; (global-set-key (kbd "C-f") 'forward-char)
 ;;
-;; use 'C-h k <keystroke>' to find out what <keystroke> ia currently bound to
+;; use 'C-h k <keystroke>' to find out what <keystroke> is currently bound to
 
 ;; (vhs) The following is required to make 'C-c C-t' insert <code> tags without
 ;; newlines. 'sgml-tag-alist' is the "file-local" version of 'html-tag-alist'
@@ -161,10 +161,6 @@
 
             <h2>Class representation in the HotSpot VM</h2>
 
-          </section>
-
-
-          <section>
             <div width="100%" style="position: relative; margin: 0 0 0 0px;">
               <div class="" style="position: static;">
                 <object data="images/CodeCacheMetaspaceHeap_1.svg" type="image/svg+xml"
@@ -223,33 +219,26 @@
 
             <h2>CDS Basics - Create the Archive</h2>
 
-          </section>
-
-          <section class="demo">
-
             <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
               <code class="terminal" data-trim="true" data-noescape="true" style="height:100%">
 $ java -Xshare:dump<span class="fragment" data-fragment-index="0">
 <span class="fragment highlight-current-border" data-fragment-index="1">Allocated shared space: 3221225472 bytes at 0x0000000800000000</span>
-<span class="fragment highlight-current-border" data-fragment-index="2">Loading classes to share ...</span> <span class="fragment" data-fragment-index="2">// from JAVA_HOME/lib/classlist</span>
+<span class="fragment highlight-current-border" data-fragment-index="2">Loading classes to share ...</span> <span class="fragment" data-fragment-index="2">// from <mark class="border">JAVA_HOME/lib/classlist</mark></span>
 <span class="fragment highlight-current-border" data-fragment-index="3">Rewriting and linking classes ...</span> <span class="fragment" data-fragment-index="3"> // Verification, ...</span>
-Number of classes 1240
-Updating ConstMethods ... done.
-Removing unshareable information ... done.
-<span class="fragment highlight-current-border" data-fragment-index="4">Relocating embedded pointers ...</span>
-Relocating external roots ...
-Verifying external roots ...
-Dumping symbol table ...
-Dumping String objects to closed archive heap region ...
-<span class="fragment highlight-current-border" data-fragment-index="5">Removing java_mirror ... done.</span> <span class="fragment" data-fragment-index="5"> // java.lang.Class&lt;?&gt;</span>
+<span class="fragment highlight-current-border" data-fragment-index="4">Number of classes 1240</span>
+<span class="fragment highlight-current-border" data-fragment-index="5">Removing unshareable information ... done.</span>
+<span class="fragment highlight-current-border" data-fragment-index="6">Relocating embedded pointers ...</span>
+<span class="fragment highlight-current-border border-no-bottom" data-fragment-index="7">Dumping symbol table ...                                </span>
+<span class="fragment highlight-current-border border-no-top   " data-fragment-index="7">Dumping String objects to closed archive heap region ...</span>
+<span class="fragment highlight-current-border" data-fragment-index="8">Removing java_mirror ... done.</span> <span class="fragment" data-fragment-index="8"> // java.lang.Class&lt;?&gt;</span>
 mc  space:     21832 [  0,1% ] ... at 0x0000000800000000
-<span class="fragment highlight-current-border" data-fragment-index="6">rw  space:   4093816 [ 22,2% ] ... at 0x0000000800006000</span>
-<span class="fragment highlight-current-border" data-fragment-index="7">ro  space:   7313320 [ 39,7% ] ... at 0x00000008003ee000</span>
+<span class="fragment highlight-current-border" data-fragment-index="9">rw  space:   4093816 [ 22,2% ] ... at 0x0000000800006000</span>
+<span class="fragment highlight-current-border" data-fragment-index="10">ro  space:   7313320 [ 39,7% ] ... at 0x00000008003ee000</span>
 md  space:      6352 [  0,0% ] ... at 0x0000000800ae8000
 od  space:   6462536 [ 35,1% ] ... at 0x0000000800aea000
-<span class="fragment highlight-current-border border-no-bottom" data-fragment-index="8">st0 space:    458752 [  2,5% ] ... at 0x00000000fff00000</span>
-<span class="fragment highlight-current-border border-no-top" data-fragment-index="8">oa0 space:     65536 [  0,4% ] ... at 0x00000000ffe00000</span>
-total    :  18422144 [100.0% ] <span class="fragment" data-fragment-index="9"> // JAVA_HOME/lib/server/classes.jsa</span></span>
+<span class="fragment highlight-current-border border-no-bottom" data-fragment-index="11">st0 space:    458752 [  2,5% ] ... at 0x00000000fff00000</span>
+<span class="fragment highlight-current-border border-no-top" data-fragment-index="11">oa0 space:     65536 [  0,4% ] ... at 0x00000000ffe00000</span>
+total    :  <span class="fragment highlight-border" data-fragment-index="12">18422144</span> [100.0% ] <span class="fragment" data-fragment-index="12"> // <mark class="border">JAVA_HOME/lib/server/classes.jsa</mark></span></span>
               </code>
             </pre>
 
@@ -292,39 +281,255 @@ $ </span><span class="fragment">java -Xshare:on <span class="fragment highlight-
 ...</span>
 <span class="fragment">[class,load] io.simonis.HelloCDS2 source: <span class="fragment highlight-current-border">file:/examples/bin/</span>
 HelloCDS</span>
+<span class="fragment">$ java -Xshare:on -Xlog:class+load io.simonis.HelloCDS \
+      | grep "shared objects file" | wc</span>
+    <span class="fragment">477    2862   40977
+$ </span><span class="fragment">java -Xshare:on -Xlog:class+load io.simonis.HelloCDS \
+      | grep -v "shared objects file" | wc</span>
+      <span class="fragment">5      17     424</span>
               </code>
             </pre>
           </section>
 
           <section class="demo">
 
-            <h2>CDS Basics - Using the Archive</h2>
+            <h2>CDS Basics - Performance</h2>
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ time -f "%e sec\n" java -Xshare:off io.simonis.HelloCDS
+Hello CDS
+0.162 sec
+$ time -f "%e sec\n" java -Xshare:on  io.simonis.HelloCDS          
+Hello CDS
+0.148 sec
+              </code>
+            </pre>
+
+            <p>About 9% overall performance improvement</p>
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ java -Xshare:off -Xlog:class+load io.simonis.HelloCDS
+[0,164s][class,load] io.simonis.HelloCDS source: file:/examples/bin
+$ java -Xshare:on  -Xlog:class+load io.simonis.HelloCDS
+[0,143s][class,load] io.simonis.HelloCDS source: file:/examples/bin
+              </code>
+            </pre>
+
+            <p>Application class loads about 13% faster</p>
+          </section>
+
+          <section class="demo">
+
+            <h2>CDS Basics - Memory</h2>
 
             <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
               <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
 $ java -Xshare:on io.simonis.HelloCDS &amp;
-HelloCDS
-$ pmap -X `pgrep -f HelloCDS`
-5707:  /jdk/bin/java -Xshare:auto io.simonis.HelloCDS
+<span class="fragment" data-fragment-index="1">HelloCDS
+$</span><span class="fragment" data-fragment-index="2"> pmap -X `pgrep -f HelloCDS`
+</span><span class="fragment" data-fragment-index="3">5707:  /jdk/bin/java -Xshare:auto io.simonis.HelloCDS
        Address Perm    Size   Rss   Pss Mapping
       00400000 r-xp       8     8     8 /jdk/bin/java
       00601000 r--p       4     4     4 /jdk/bin/java
       00602000 rw-p       4     4     4 /jdk/bin/java
       009b8000 rw-p     132    28    28 [heap]
-      83200000 rw-p  129024  2048  2048
-      8b000000 ---p 1914880     0     0
+      <span class="fragment highlight-current-border" data-fragment-index="4">83200000 rw-p  129024  2048  2048</span> <span class="fragment" data-fragment-index="4">//   mapped Java heap</span>
+      <span class="fragment highlight-current-border" data-fragment-index="5">8b000000 ---p 1914880     0     0</span> <span class="fragment" data-fragment-index="5">// unmapped Java heap</span>
       ffe00000 rw-p      64    64    64 /jdk/lib/server/classes.jsa
       fff00000 rw-p     448   448   448 /jdk/lib/server/classes.jsa
      800000000 rwxp      24    24    24 /jdk/lib/server/classes.jsa
-     800006000 rw-p    4000  3168  3168 /jdk/lib/server/classes.jsa
-     8003ee000 r--p    7144  5160  5160 /jdk/lib/server/classes.jsa
+     <span class="fragment highlight-current-border" data-fragment-index="6">800006000 rw-p    4000  3168  3168 /jdk/lib/server/classes.jsa</span>
+     <span class="fragment highlight-current-border" data-fragment-index="7">8003ee000 r--p    7144  5160  5160 /jdk/lib/server/classes.jsa</span>
      800ae8000 rw-p       8     8     8 /jdk/lib/server/classes.jsa
-     800aea000 r--p    6312     0     0 /jdk/lib/server/classes.jsa
+     800aea000 r--p    6312     0     0 /jdk/lib/server/classes.jsa</span>
               </code>
             </pre>
           </section>
 
         </section>
+
+
+        <section class="demo">
+
+          <section class="demo">
+
+            <h2>CDS &amp; AppCDS with <a href="https://tomcat.apache.org/download-90.cgi">Tomcat 9</a> &amp; <a href="http://naver.github.io/ngrinder/">nGrinder</a></h2>
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ CATALINA_OPTS="<span class="fragment highlight-current-border">-Xshare:on</span> \
+                 -Xlog:class+load:file=/tmp/tomcat.classtrace" \
+  catalina.sh start
+$ <span class="fragment">wc /tmp/tomcat.classtrace</span>
+  <span class="fragment"><span class="fragment highlight-border">12644</span>   50575 2075264 /tmp/tomcat.classtrace
+$</span> <span class="fragment">grep "<span class="fragment highlight-current-border">shared objects file</span>" /tmp/tomcat.classtrace | wc</span>
+   <span class="fragment"><span class="fragment highlight-border">1156</span>    6936  103052
+$</span> <span class="fragment">CATALINA_OPTS="<span class="fragment highlight-current-border">-XX:DumpLoadedClassList=/tmp/tomcat.cls</span>" \
+  catalina.sh start
+$</span> <span class="fragment">wc /tmp/tomcat.cls</span>
+   <span class="fragment"><span class="fragment highlight-border">3261</span>   3261 125647 /tmp/tomcat.cls
+$</span> <span class="fragment">CATALINA_OPTS="-XX:DumpLoadedClassList=/tmp/tomcat_appcds.cls \
+                 <span class="fragment highlight-current-border">-XX:+UseAppCDS</span>" \
+  catalina.sh start
+$</span> <span class="fragment">wc /tmp/tomcat_appcds.cls</span>
+   <span class="fragment"><span class="fragment highlight-border">3520</span>   3520 133431 /tmp/tomcat_appcds.cls</span>
+              </code>
+            </pre>
+          </section>
+
+          <section class="demo">
+
+            <h2>CDS &amp; AppCDS with <a href="https://tomcat.apache.org/download-90.cgi">Tomcat 9</a> &amp; <a href="http://naver.github.io/ngrinder/">nGrinder</a></h2>
+
+            <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+              <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ CATALINA_OPTS="<span class="fragment highlight-current-border">-Xshare:dump -XX:+UseAppCDS</span> \
+                 <span class="fragment highlight-current-border">-XX:SharedClassListFile=/tmp/tomcat_appcds.cls</span> \
+                 -XX:+UnlockDiagnosticVMOptions \
+                 <span class="fragment highlight-current-border">-XX:SharedArchiveFile=/tmp/tomcat_appcds.jsa</span>" \
+  catalina.sh start
+$<span class="fragment"> ll /tmp/tomcat_appcds.jsa</span>
+<span class="fragment">-r--r----- <span class="fragment highlight-current-border">49.979.392</span> Feb  2 23:57 /tmp/tomcat_appcds.jsa
+$</span> <span class="fragment">CATALINA_OPTS="<span class="fragment highlight-current-border">-Xshare:on -XX:+UseAppCDS</span> \
+                 -XX:+UnlockDiagnosticVMOptions \
+                 <span class="fragment highlight-current-border">-XX:SharedArchiveFile=/tmp/tomcat_appcds.jsa</span>" \
+  catalina.sh start</span>
+              </code>
+            </pre>
+          </section>
+
+        </section>
+
+        <section class="demo">
+
+          <section class="demo">
+
+            <h2>AppCDS - Application Class Data Sharing</h2>
+
+            <ul>
+              <li class="fragment">OpenJDK 10: <a href="http://openjdk.java.net/jeps/31">JEP 310 - Application Class-Data Sharing</a></li>
+              <li class="fragment">Supports sharing of classes loaded by the application class loader <br/> (a.k.a. system class loader) with <code>-XX:+UseAppCDS</code></li>
+              <li class="fragment"><em>Supports sharing of classes loaded by custom class loaders</em></li>
+              <li class="fragment">Unfortunately <code>-XX:DumpLoadedClassList=.. -XX:+UseAppCDS</code> <br/> doesn't dump classes loaded by custom class loaders</li>
+            </ul>
+          </section>
+
+          <section class="demo">
+
+            <h2>AppCDS - Class List Format</h2>
+
+            <ul>
+              <li><code>-XX:DumpLoadedClassList=...</code> creates a trivial class list:
+
+                <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+                  <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ cat /tmp/tomcat_appcds.cls
+java/lang/Object
+java/lang/String                                          
+...
+<span class="fragment highlight-current-border">org/apache/catalina/startup/Bootstrap</span>
+                  </code>
+                </pre>
+              </li>
+              <li class="fragment">The format for classes loaded by custom class loaders isn't specified anywhere, except:
+                <a href="http://hg.openjdk.java.net/jdk/jdk/file/tip/src/hotspot/share/classfile/classListParser.cpp">classListParser.cpp</a>
+
+                <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+                  <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+CLASSNAME [ ID ]?
+CLASSNAME ID super: ID [ interface: [ ID ]+ ]? source: URL
+                  </code>
+                </pre>
+              </li>
+            </ul>
+          </section>
+
+          <section class="demo">
+
+            <h2>Creating a Class List for Custom Loaders</h2>
+
+            <ul>
+              <li><code>-Xlog:class+load=debug</code> has all we need:
+
+                <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+                  <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ CATALINA_OPTS="-Xlog:class+load=debug" catalina.sh start
+[..] <span class="fragment highlight-current-border">java.lang.Object source: jrt:/java.base</span>
+[..]  klass: 0x100000eb0 super: 0x000000000 <span class="fragment highlight-current-border">loader: [NULL class loader]</span>
+....
+[..] <span class="fragment highlight-current-border">java.sql.Timestamp source: jrt:/java.sql</span>
+[..]  klass: 0x100096c30 super: 0x100091a00 \
+      <span class="fragment highlight-current-border">loader: [0xff0172600 a 'ClassLoaders$PlatformClassLoader']</span>
+....
+[..] <span class="fragment highlight-current-border">org.apache.catalina.Server source: file:catalina.jar</span>
+[..]  klass: 0x1000e6410 <span class="fragment highlight-current-border">super: 0x100000eb0</span> <span class="fragment highlight-current-border">interfaces: 0x1000e6238</span> \
+      <span class="fragment highlight-current-border">loader: [0xff0310fb0 a 'java/net/URLClassLoader']</span>
+                  </code>
+                </pre>
+              </li>
+              <li class="fragment">From this we can easily create:
+
+                <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+                  <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+java/lang/Object           id: 0x100000eb0
+java/sql/Timestamp         id: 0x100096c30
+org/apache/catalina/Server id: 0x1000e6410 super: 0x100000eb0 \
+                           interfaces: 0x1000e6238 source: catalina.jar
+                  </code>
+                </pre>
+              </li>
+            </ul>
+          </section>
+
+          <section class="demo">
+
+            <h2><code><a href="https://github.com/simonis/cl4cds">cl4cds</a></code></h2>
+
+            <code>cl4cds</code> converts a class log to a CDS class list:
+
+                <pre class="big noshadow" style="height:100%; margin: 0;" data-trim="true">
+                  <code class="terminal" data-trim="true" data-noescape="true" style="height:100%;">
+$ CATALINA_OPTS="<span class="fragment highlight-current-border">-Xlog:class+load=debug:file=tomcat_dbg.clstrace</span>" \
+  catalina.sh start
+$ <span class="fragment">java io.simonis.cl4cds <span class="fragment highlight-current-border">tomcat_dbg.clstrace</span> <span class="fragment highlight-current-border">tomcat_cl4cds.cls</span>
+$</span><span class="fragment"> CATALINA_OPTS="<span class="fragment highlight-current-border">-Xshare:dump</span> -XX:+UseAppCDS \
+                 <span class="fragment highlight-current-border">-XX:SharedClassListFile=tomcat_cl4cds.cls</span> \
+                 -XX:+UnlockDiagnosticVMOptions \
+                 <span class="fragment highlight-current-border">-XX:SharedArchiveFile=tomcat_cl4cds.jsa</span>" \
+  catalina.sh start
+$</span><span class="fragment"> ll tomcat_cl4cds.jsa</span>
+<span class="fragment">-r--r----- 1 <span class="fragment highlight-border">102.305.792</span> Feb  3 01:48 tomcat_cl4cds.jsa
+$</span><span class="fragment"> CATALINA_OPTS="<span class="fragment highlight-current-border">-Xshare:on</span> -XX:+UseAppCDS \
+                 -XX:+UnlockDiagnosticVMOptions \
+                 <span class="fragment highlight-current-border">-XX:SharedArchiveFile=tomcat_cl4cds.jsa</span> \
+                 <span class="fragment highlight-current-border">-Xlog:class+load:file=tomcat_cl4cds.clstrace</span>" \
+  catalina.sh start
+$</span><span class="fragment"> wc tomcat_cl4cds.clstrace</span>
+  <span class="fragment"><span class="fragment highlight-border">12644</span>   69335 1531203 tomcat_cl4cds.clstrace
+$</span><span class="fragment"> grep "shared objects " tomcat_cl4cds.clstrace | wc</span>
+   <span class="fragment"><span class="fragment highlight-border">9380</span>   56280  963418</span>
+                  </code>
+                </pre>
+          </section>
+
+        </section>
+
+        <section>
+
+          <h2>AppCDS - Current Limitations</h2>
+
+          <ul>
+            <li>Can't share pre 1.5 classes</li>
+            <li>Can't share dynamically generated classes</li>
+            <li>Can't share classes loaded from files (only .jar archives)</li>
+            <li>Can't share classes modified by the class loader</li>
+            <li>Can share only one class if loaded by several class loaders</li>
+            <li>No bytecode-rewriting (slow interpreter)</li>
+          </ul>
+        </section>
+
 
         <section>
 
@@ -333,6 +538,51 @@ $ pmap -X `pgrep -f HelloCDS`
         </section>
 
 <!--
+
+AppCds - Ceavets
+
+- can't share pre 1.5 classes
+- can't share dynamically generated classes
+- can't share classes loaded from files (only .jar archives)
+- can share only one class if loaded by several class loaders
+- can't share classes modified by the class loader
+
+- no bytecode-rewriting (slow interpreter)
+
+$ CATALINA_OPTS="-Xshare:on -Xlog:class+load:file=/tmp/tomcat.classtrace" $CATALINA_HOME/bin/catalina.sh start
+$ wc /tmp/tomcat.classtrace
+  12644   50575 2075264 /tmp/tomcat.classtrace
+$ grep "shared objects file" /tmp/tomcat.classtrace | wc
+   1156    6936  103052
+$ CATALINA_OPTS="-XX:DumpLoadedClassList=/tmp/tomcat.cls" $CATALINA_HOME/bin/catalina.sh start
+$ wc /tmp/tomcat.cls
+  3261   3261 125647 /tmp/tomcat.cls
+$ CATALINA_OPTS="-XX:DumpLoadedClassList=/tmp/tomcat_appcds.cls -XX:+UseAppCDS" $CATALINA_HOME/bin/catalina.sh start
+$ wc /tmp/tomcat_appcds.cls
+  3520   3520 133431 /tmp/tomcat_appcds.cls
+
+$ CATALINA_OPTS="-Xlog:class+load=debug:file=/tmp/tomcat_debug.classtrace" $CATALINA_HOME/bin/catalina.sh start
+
+[0.009s][info ][class,load] java.lang.Object source: jrt:/java.base
+[0.009s][debug][class,load]  klass: 0x0000000100000eb0 super: 0x0000000000000000 loader: [NULL class loader] bytes: 1932 checksum: b0107909
+...
+[0,213s][info ][class,load] java.sql.Timestamp source: jrt:/java.sql
+[0,213s][debug][class,load]  klass: 0x0000000100096c30 super: 0x0000000100091a00 loader: [class loader 0x00007ffff0172600 a 'jdk/internal/loader/ClassLoaders$PlatformClassLoader'{0x000000008af9f628}] bytes: 6804 checksum: 27
+...
+[0,492s][info ][class,load] org.apache.catalina.Server source: file:/share/software/Java/apache-tomcat-9.0.2/lib/catalina.jar
+[0,492s][debug][class,load]  klass: 0x00000001000e6410 super: 0x0000000100000eb0 interfaces: 0x00000001000e6238 loader: [class loader 0x00007ffff0310fb0 a 'java/net/URLClassLoader'{0x000000008aabf5b0}] bytes: 1244 checksum: 
+
+org/apache/catalina/Lifecycle id: 0x00000001000e6238 super: 0x0000000100000eb0 source: catalina.jar
+org/apache/catalina/Server id: 0x00000001000e6410 super: 0x0000000100000eb0 interfaces: 0x00000001000e6238 source: catalina.jar
+
+$ CATALINA_OPTS="-Xshare:dump -XX:+UseAppCDS -XX:SharedClassListFile=/tmp/tomcat_cl4cds.cls -XX:+UnlockDiagnosticVMOptions -XX:SharedArchiveFile=/tmp/tomcat_cl4cds.jsa" $CATALINA_HOME/bin/catalina.sh start
+
+$ CATALINA_OPTS="-Xshare:on -XX:+UseAppCDS -XX:+UnlockDiagnosticVMOptions -XX:SharedArchiveFile=/tmp/tomcat_cl4cds.jsa -Xlog:class+load:file=/tmp/tomcat_cl4cds.classtrace" $CATALINA_HOME/bin/catalina.sh start
+$ wc /tmp/tomcat_cl4cds.classtrace
+  12644   69335 1531203 /tmp/tomcat_cl4cds.classtrace
+$ grep "shared objects " /tmp/tomcat_cl4cds.classtrace | wc
+   9380   56280  963418
+
 
 ConstantPool::archive_resolved_references(Thread *) : void - /jdk-hs/share/oops/constantPool.cpp
   MetaspaceShared::archive_resolved_constants(Thread *) : void - /jdk-hs/share/memory/metaspaceShared.cpp
@@ -559,3 +809,40 @@ hljs.initHighlightingOnLoad(); } },
 
   </body>
 </html>
+
+<!--  LocalWords:  HotSpot VM eval defun setq inputStr substring kbd
+ -->
+<!--  LocalWords:  resultStr concat vhs CDS AppCDS nGrinder OpenJDK
+ -->
+<!--  LocalWords:  JEP classListParser cpp pre bytecode MemRegion GCs
+ -->
+<!--  LocalWords:  bool init jint simonis JVMCI bytecodes vm Xshare
+ -->
+<!--  LocalWords:  DumpSharedSpaces RequireSharedSpaces endif nofast
+ -->
+<!--  LocalWords:  UseSharedSpaces unshareable CompressedOops ffff fd
+ -->
+<!--  LocalWords:  SharedBaseAddress TwoLoaders cls args canTryAgain
+ -->
+<!--  LocalWords:  JNI CreateJavaVM penv bdd bcd InitializeJVM pvm ee
+ -->
+<!--  LocalWords:  ifn bca JavaMain fffffffa faffd loadClass cp oop
+ -->
+<!--  LocalWords:  UnlockDiagnosticVMOptions SharedArchiveFile Klass
+ -->
+<!--  LocalWords:  PrintSharedArchiveAndExit PrintSharedDictionary ik
+ -->
+<!--  LocalWords:  ClassLoaderData ArrayKlass ModuleEntry const klass
+ -->
+<!--  LocalWords:  InstanceKlass ClassFileStream GrowableArray jni
+ -->
+<!--  LocalWords:  SharedDictionaryEntry DefineClass JNIEnv jobject
+ -->
+<!--  LocalWords:  jbyte jsize jclass NativeInterface jvm impl jdk
+ -->
+<!--  LocalWords:  JNINativeInterface jstring jbyteArray altough TODO
+ -->
+<!--  LocalWords:  JNINativeMethod DefineClassWithSource runtime cds
+ -->
+<!--  LocalWords:  DictionaryEntry shoould strncmp
+ -->
